@@ -11,6 +11,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
+    BotCommand,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -35,27 +36,22 @@ sessions: dict[int, list[int]] = {}
 # ---------- Клавиатуры ----------
 
 def main_menu_kb() -> InlineKeyboardMarkup:
-    """Главное меню, разбитое на секции."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            # Узнать себя
-            [InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")],
-            # Мой путь
+            [InlineKeyboardButton(text="📝 Пройти тест",    callback_data="start_test")],
             [
-                InlineKeyboardButton(text="📅  Задание дня",  callback_data="daily_task"),
-                InlineKeyboardButton(text="🧘  Моя практика", callback_data="my_practice"),
+                InlineKeyboardButton(text="📅 Задание дня",  callback_data="daily_task"),
+                InlineKeyboardButton(text="🧘 Моя практика", callback_data="my_practice"),
             ],
-            # Изучить
             [
-                InlineKeyboardButton(text="📖  4 типа людей", callback_data="show_types"),
-                InlineKeyboardButton(text="✨  Все практики",  callback_data="show_practices"),
+                InlineKeyboardButton(text="📖 4 типа людей", callback_data="show_types"),
+                InlineKeyboardButton(text="✨ Все практики",  callback_data="show_practices"),
             ],
         ]
     )
 
 
 def question_kb(q_index: int) -> InlineKeyboardMarkup:
-    """Кнопки только с буквой — полный текст варианта уже в сообщении."""
     row = [
         InlineKeyboardButton(text=LETTERS[i], callback_data=f"ans:{q_index}:{i}")
         for i in range(4)
@@ -74,7 +70,7 @@ def types_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="3-й тип", callback_data="type:3"),
                 InlineKeyboardButton(text="4-й тип", callback_data="type:4"),
             ],
-            [InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")],
+            [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
         ]
     )
 
@@ -90,7 +86,7 @@ def practices_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Для 3-го типа", callback_data="practice:3"),
                 InlineKeyboardButton(text="Для 4-го типа", callback_data="practice:4"),
             ],
-            [InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")],
+            [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
         ]
     )
 
@@ -98,10 +94,10 @@ def practices_kb() -> InlineKeyboardMarkup:
 def result_kb(type_num: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🧘  Моя практика",         callback_data=f"practice:{type_num}")],
-            [InlineKeyboardButton(text="📅  Начать 30-дневную программу", callback_data="start_program")],
-            [InlineKeyboardButton(text="🔄  Пройти тест заново",   callback_data="start_test")],
-            [InlineKeyboardButton(text="⬅️  В меню",               callback_data="menu")],
+            [InlineKeyboardButton(text="🧘 Моя практика",            callback_data=f"practice:{type_num}")],
+            [InlineKeyboardButton(text="📅 Начать 30-дневную программу", callback_data="start_program")],
+            [InlineKeyboardButton(text="🔄 Пройти тест заново",      callback_data="start_test")],
+            [InlineKeyboardButton(text="⬅️ В меню",                  callback_data="menu")],
         ]
     )
 
@@ -145,6 +141,11 @@ async def cmd_test(message: Message) -> None:
     await send_question(message, 0)
 
 
+@dp.message(Command("day"))
+async def cmd_day(message: Message) -> None:
+    await send_daily_task(message, message.from_user.id)
+
+
 @dp.message(Command("types"))
 async def cmd_types(message: Message) -> None:
     await message.answer("Выберите тип, чтобы прочитать описание:", reply_markup=types_kb())
@@ -153,6 +154,11 @@ async def cmd_types(message: Message) -> None:
 @dp.message(Command("practices"))
 async def cmd_practices(message: Message) -> None:
     await message.answer("Выберите практику для своего типа:", reply_markup=practices_kb())
+
+
+@dp.message(Command("menu"))
+async def cmd_menu(message: Message) -> None:
+    await message.answer(WELCOME, reply_markup=main_menu_kb())
 
 
 @dp.callback_query(F.data == "menu")
@@ -197,9 +203,9 @@ async def cb_my_practice(callback: CallbackQuery) -> None:
     type_num = db.get_user_type(user_id)
     if type_num is None:
         await callback.message.answer(
-            "Сначала пройди тест — тогда я покажу практику именно для твоего типа 🙂",
+            "Сначала пройди тест — тогда покажу практику именно для твоего типа 🙂",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")]]
+                inline_keyboard=[[InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")]]
             ),
         )
     else:
@@ -261,9 +267,9 @@ async def send_daily_task(message: Message, user_id: int) -> None:
     type_num = db.get_user_type(user_id)
     if type_num is None:
         await message.answer(
-            "Сначала пройди тест — тогда я подберу задания именно для твоего типа 🙂",
+            "Сначала пройди тест — тогда подберу задания именно для твоего типа 🙂",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")]]
+                inline_keyboard=[[InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")]]
             ),
         )
         return
@@ -282,8 +288,8 @@ async def send_daily_task(message: Message, user_id: int) -> None:
             "Начать сегодня?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🚀  Начать программу", callback_data="start_program")],
-                    [InlineKeyboardButton(text="⬅️  В меню",           callback_data="menu")],
+                    [InlineKeyboardButton(text="🚀 Начать программу", callback_data="start_program")],
+                    [InlineKeyboardButton(text="⬅️ В меню",           callback_data="menu")],
                 ]
             ),
         )
@@ -294,9 +300,9 @@ async def send_daily_task(message: Message, user_id: int) -> None:
             get_final(type_num),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🔄  Пройти тест заново",       callback_data="start_test")],
-                    [InlineKeyboardButton(text="🔁  Начать программу заново",  callback_data="restart_program")],
-                    [InlineKeyboardButton(text="⬅️  В меню",                   callback_data="menu")],
+                    [InlineKeyboardButton(text="🔄 Пройти тест заново",      callback_data="start_test")],
+                    [InlineKeyboardButton(text="🔁 Начать программу заново", callback_data="restart_program")],
+                    [InlineKeyboardButton(text="⬅️ В меню",                  callback_data="menu")],
                 ]
             ),
         )
@@ -305,14 +311,9 @@ async def send_daily_task(message: Message, user_id: int) -> None:
     await message.answer(
         f"📅 <b>День {day} из {len(tasks)}</b>\n\n{tasks[day - 1]}",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")]]
+            inline_keyboard=[[InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")]]
         ),
     )
-
-
-@dp.message(Command("day"))
-async def cmd_day(message: Message) -> None:
-    await send_daily_task(message, message.from_user.id)
 
 
 @dp.callback_query(F.data == "daily_task")
@@ -349,15 +350,19 @@ async def cb_restart_program(callback: CallbackQuery) -> None:
 
 @dp.message()
 async def fallback(message: Message) -> None:
-    await message.answer(
-        "Воспользуйся меню или командами:\n"
-        "/start — главное меню\n"
-        "/test — пройти тест\n"
-        "/day — задание дня\n"
-        "/types — четыре типа людей\n"
-        "/practices — все практики",
-        reply_markup=main_menu_kb(),
-    )
+    await message.answer(WELCOME, reply_markup=main_menu_kb())
+
+
+# ---------- Запуск ----------
+
+BOT_COMMANDS = [
+    BotCommand(command="start",     description="Главное меню"),
+    BotCommand(command="test",      description="Пройти тест"),
+    BotCommand(command="day",       description="Задание дня"),
+    BotCommand(command="practices", description="Все практики"),
+    BotCommand(command="types",     description="4 типа людей"),
+    BotCommand(command="menu",      description="Открыть меню"),
+]
 
 
 async def main() -> None:
@@ -367,6 +372,7 @@ async def main() -> None:
             "Не задан BOT_TOKEN. Укажите токен в переменной окружения BOT_TOKEN или в файле .env"
         )
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    await bot.set_my_commands(BOT_COMMANDS)
     logger.info("Бот «Внутренний путь» запущен")
     await dp.start_polling(bot)
 
