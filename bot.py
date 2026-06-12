@@ -23,7 +23,7 @@ from aiogram.types import (
 
 import db
 from content import LETTERS, PRACTICES, QUESTIONS, TYPES, WELCOME
-from tasks import PROGRAM_FINAL, PROGRAM_NOT_READY, TASKS
+from tasks import PROGRAM_NOT_READY, TASKS, get_final
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -271,7 +271,7 @@ async def send_daily_task(message: Message, user_id: int) -> None:
 
     if day > len(tasks):
         await message.answer(
-            PROGRAM_FINAL,
+            get_final(type_num),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
