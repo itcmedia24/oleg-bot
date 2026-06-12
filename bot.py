@@ -50,11 +50,12 @@ def main_menu_kb() -> InlineKeyboardMarkup:
 
 
 def question_kb(q_index: int) -> InlineKeyboardMarkup:
-    rows = [
-        [InlineKeyboardButton(text=f"{LETTERS[i]}) {opt}"[:64], callback_data=f"ans:{q_index}:{i}")]
-        for i, opt in enumerate(QUESTIONS[q_index]["options"])
+    """Кнопки только с буквой — полный текст варианта уже в сообщении."""
+    row = [
+        InlineKeyboardButton(text=LETTERS[i], callback_data=f"ans:{q_index}:{i}")
+        for i in range(4)
     ]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+    return InlineKeyboardMarkup(inline_keyboard=[row])
 
 
 def types_kb() -> InlineKeyboardMarkup:
@@ -104,7 +105,15 @@ def result_kb(type_num: int) -> InlineKeyboardMarkup:
 
 async def send_question(message: Message, q_index: int) -> None:
     q = QUESTIONS[q_index]
-    text = f"<b>Вопрос {q_index + 1} из {len(QUESTIONS)}</b>\n\n{q['text']}"
+    options_text = "\n".join(
+        f"{LETTERS[i]})  {opt}"
+        for i, opt in enumerate(q["options"])
+    )
+    text = (
+        f"<b>Вопрос {q_index + 1} из {len(QUESTIONS)}</b>\n\n"
+        f"{q['text']}\n\n"
+        f"{options_text}"
+    )
     await message.answer(text, reply_markup=question_kb(q_index))
 
 
@@ -160,7 +169,9 @@ async def cb_start_test(callback: CallbackQuery) -> None:
     await callback.message.answer(
         "📝 <b>Тест: на каком этапе взаимодействия с сознанием вы находитесь?</b>\n\n"
         "12 вопросов. Отвечайте честно, выбирая вариант, который ближе всего "
-        "к вашему опыту."
+        "к вашему опыту.\n\n"
+        "Варианты ответов будут перечислены в тексте каждого вопроса — "
+        "нажмите кнопку с нужной буквой."
     )
     await send_question(callback.message, 0)
     await callback.answer()
@@ -211,7 +222,7 @@ async def cb_answer(callback: CallbackQuery) -> None:
 
     answers.append(opt)
 
-    # Убираем кнопки с отвеченного вопроса и помечаем выбор
+    # Помечаем выбранный вариант прямо в тексте вопроса
     try:
         await callback.message.edit_text(
             callback.message.html_text + f"\n\n✅ Ваш ответ: {LETTERS[opt]}"
@@ -230,7 +241,6 @@ async def cb_answer(callback: CallbackQuery) -> None:
             reply_markup=result_kb(type_num),
         )
     await callback.answer()
-
 
 
 # ---------- 30-дневная программа ----------
