@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Телеграм-бот: проводник по этапам внутреннего развития.
-
-Тест из 12 вопросов определяет один из четырёх типов взаимодействия
-с сознанием и выдаёт подходящие практики.
-"""
+"""Телеграм-бот «Внутренний путь» — проводник по этапам развития."""
 
 import asyncio
 import logging
@@ -39,12 +35,21 @@ sessions: dict[int, list[int]] = {}
 # ---------- Клавиатуры ----------
 
 def main_menu_kb() -> InlineKeyboardMarkup:
+    """Главное меню, разбитое на секции."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")],
-            [InlineKeyboardButton(text="📖 Четыре типа людей", callback_data="show_types")],
-            [InlineKeyboardButton(text="🧘 Практики", callback_data="show_practices")],
-            [InlineKeyboardButton(text="📅 Задание дня", callback_data="daily_task")],
+            # Узнать себя
+            [InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")],
+            # Мой путь
+            [
+                InlineKeyboardButton(text="📅  Задание дня",  callback_data="daily_task"),
+                InlineKeyboardButton(text="🧘  Моя практика", callback_data="my_practice"),
+            ],
+            # Изучить
+            [
+                InlineKeyboardButton(text="📖  4 типа людей", callback_data="show_types"),
+                InlineKeyboardButton(text="✨  Все практики",  callback_data="show_practices"),
+            ],
         ]
     )
 
@@ -69,7 +74,7 @@ def types_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="3-й тип", callback_data="type:3"),
                 InlineKeyboardButton(text="4-й тип", callback_data="type:4"),
             ],
-            [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+            [InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")],
         ]
     )
 
@@ -85,7 +90,7 @@ def practices_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="Для 3-го типа", callback_data="practice:3"),
                 InlineKeyboardButton(text="Для 4-го типа", callback_data="practice:4"),
             ],
-            [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+            [InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")],
         ]
     )
 
@@ -93,10 +98,10 @@ def practices_kb() -> InlineKeyboardMarkup:
 def result_kb(type_num: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="🧘 Моя практика", callback_data=f"practice:{type_num}")],
-            [InlineKeyboardButton(text="📅 Начать 30-дневную программу", callback_data="start_program")],
-            [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
-            [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🧘  Моя практика",         callback_data=f"practice:{type_num}")],
+            [InlineKeyboardButton(text="📅  Начать 30-дневную программу", callback_data="start_program")],
+            [InlineKeyboardButton(text="🔄  Пройти тест заново",   callback_data="start_test")],
+            [InlineKeyboardButton(text="⬅️  В меню",               callback_data="menu")],
         ]
     )
 
@@ -118,19 +123,12 @@ async def send_question(message: Message, q_index: int) -> None:
 
 
 def calc_result(answers: list[int]) -> int:
-    """Определяет тип по преобладающим ответам.
-
-    Индекс ответа 0..3 соответствует типу 1..4.
-    При равенстве голосов берётся более ранний (меньший) тип.
-    """
     counts = Counter(answers)
-    best_type = 1
-    best_count = -1
+    best_type, best_count = 1, -1
     for t in (1, 2, 3, 4):
         c = counts.get(t - 1, 0)
         if c > best_count:
-            best_count = c
-            best_type = t
+            best_count, best_type = c, t
     return best_type
 
 
@@ -154,7 +152,7 @@ async def cmd_types(message: Message) -> None:
 
 @dp.message(Command("practices"))
 async def cmd_practices(message: Message) -> None:
-    await message.answer("Выберите практику для вашего типа:", reply_markup=practices_kb())
+    await message.answer("Выберите практику для своего типа:", reply_markup=practices_kb())
 
 
 @dp.callback_query(F.data == "menu")
@@ -167,11 +165,11 @@ async def cb_menu(callback: CallbackQuery) -> None:
 async def cb_start_test(callback: CallbackQuery) -> None:
     sessions[callback.from_user.id] = []
     await callback.message.answer(
-        "📝 <b>Тест: на каком этапе взаимодействия с сознанием вы находитесь?</b>\n\n"
-        "12 вопросов. Отвечайте честно, выбирая вариант, который ближе всего "
-        "к вашему опыту.\n\n"
-        "Варианты ответов будут перечислены в тексте каждого вопроса — "
-        "нажмите кнопку с нужной буквой."
+        "📝 <b>Тест: на каком этапе взаимодействия с сознанием ты находишься?</b>\n\n"
+        "12 вопросов. Отвечай честно, выбирая вариант, который ближе всего "
+        "к твоему опыту.\n\n"
+        "Варианты перечислены в тексте каждого вопроса — "
+        "нажми кнопку с нужной буквой."
     )
     await send_question(callback.message, 0)
     await callback.answer()
@@ -188,8 +186,24 @@ async def cb_show_types(callback: CallbackQuery) -> None:
 @dp.callback_query(F.data == "show_practices")
 async def cb_show_practices(callback: CallbackQuery) -> None:
     await callback.message.answer(
-        "Выберите практику для вашего типа:", reply_markup=practices_kb()
+        "Выберите практику для своего типа:", reply_markup=practices_kb()
     )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "my_practice")
+async def cb_my_practice(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    type_num = db.get_user_type(user_id)
+    if type_num is None:
+        await callback.message.answer(
+            "Сначала пройди тест — тогда я покажу практику именно для твоего типа 🙂",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")]]
+            ),
+        )
+    else:
+        await callback.message.answer(PRACTICES[type_num], reply_markup=practices_kb())
     await callback.answer()
 
 
@@ -215,17 +229,15 @@ async def cb_answer(callback: CallbackQuery) -> None:
 
     answers = sessions.setdefault(user_id, [])
 
-    # Защита от повторного нажатия / старых кнопок
     if q_index != len(answers):
         await callback.answer("Этот вопрос уже отвечен 🙂", show_alert=False)
         return
 
     answers.append(opt)
 
-    # Помечаем выбранный вариант прямо в тексте вопроса
     try:
         await callback.message.edit_text(
-            callback.message.html_text + f"\n\n✅ Ваш ответ: {LETTERS[opt]}"
+            callback.message.html_text + f"\n\n✅ Твой ответ: {LETTERS[opt]}"
         )
     except Exception:
         pass
@@ -237,7 +249,7 @@ async def cb_answer(callback: CallbackQuery) -> None:
         sessions.pop(user_id, None)
         db.set_user_type(user_id, type_num)
         await callback.message.answer(
-            f"🎯 <b>Ваш результат: {type_num}-й тип</b>\n\n{TYPES[type_num]}",
+            f"🎯 <b>Твой результат: {type_num}-й тип</b>\n\n{TYPES[type_num]}",
             reply_markup=result_kb(type_num),
         )
     await callback.answer()
@@ -249,11 +261,9 @@ async def send_daily_task(message: Message, user_id: int) -> None:
     type_num = db.get_user_type(user_id)
     if type_num is None:
         await message.answer(
-            "Сначала пройдите тест, чтобы я подобрал задания именно для вашего типа 🙂",
+            "Сначала пройди тест — тогда я подберу задания именно для твоего типа 🙂",
             reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")]
-                ]
+                inline_keyboard=[[InlineKeyboardButton(text="📝  Пройти тест", callback_data="start_test")]]
             ),
         )
         return
@@ -266,14 +276,14 @@ async def send_daily_task(message: Message, user_id: int) -> None:
     day = db.get_program_day(user_id)
     if day is None:
         await message.answer(
-            f"📅 <b>30-дневная программа для {type_num}-го типа</b>\n\n"
-            "Каждый день вы будете получать одно задание. "
-            "Новое задание открывается на следующий календарный день.\n\n"
+            f"📅 <b>30-дневная программа — {type_num}-й тип</b>\n\n"
+            "Каждый день одно задание. "
+            "Новое открывается на следующий календарный день.\n\n"
             "Начать сегодня?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🚀 Начать программу", callback_data="start_program")],
-                    [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+                    [InlineKeyboardButton(text="🚀  Начать программу", callback_data="start_program")],
+                    [InlineKeyboardButton(text="⬅️  В меню",           callback_data="menu")],
                 ]
             ),
         )
@@ -284,18 +294,18 @@ async def send_daily_task(message: Message, user_id: int) -> None:
             get_final(type_num),
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
-                    [InlineKeyboardButton(text="🔁 Начать программу заново", callback_data="restart_program")],
-                    [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+                    [InlineKeyboardButton(text="🔄  Пройти тест заново",       callback_data="start_test")],
+                    [InlineKeyboardButton(text="🔁  Начать программу заново",  callback_data="restart_program")],
+                    [InlineKeyboardButton(text="⬅️  В меню",                   callback_data="menu")],
                 ]
             ),
         )
         return
 
     await message.answer(
-        f"📅 День {day} из {len(tasks)}\n\n{tasks[day - 1]}",
+        f"📅 <b>День {day} из {len(tasks)}</b>\n\n{tasks[day - 1]}",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")]]
+            inline_keyboard=[[InlineKeyboardButton(text="⬅️  В меню", callback_data="menu")]]
         ),
     )
 
@@ -316,7 +326,7 @@ async def cb_start_program(callback: CallbackQuery) -> None:
     user_id = callback.from_user.id
     type_num = db.get_user_type(user_id)
     if type_num is None:
-        await callback.answer("Сначала пройдите тест 🙂", show_alert=True)
+        await callback.answer("Сначала пройди тест 🙂", show_alert=True)
         return
     if not TASKS.get(type_num):
         await callback.message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb())
@@ -340,12 +350,12 @@ async def cb_restart_program(callback: CallbackQuery) -> None:
 @dp.message()
 async def fallback(message: Message) -> None:
     await message.answer(
-        "Воспользуйтесь меню или командами:\n"
+        "Воспользуйся меню или командами:\n"
         "/start — главное меню\n"
         "/test — пройти тест\n"
         "/day — задание дня\n"
         "/types — четыре типа людей\n"
-        "/practices — практики",
+        "/practices — все практики",
         reply_markup=main_menu_kb(),
     )
 
@@ -354,19 +364,16 @@ async def main() -> None:
     db.init_db()
     if not BOT_TOKEN:
         raise RuntimeError(
-            "Не задан BOT_TOKEN. Укажите токен бота в переменной окружения "
-            "BOT_TOKEN или в файле .env"
+            "Не задан BOT_TOKEN. Укажите токен в переменной окружения BOT_TOKEN или в файле .env"
         )
     bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    logger.info("Бот запущен")
+    logger.info("Бот «Внутренний путь» запущен")
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    # Подхватываем .env, если есть python-dotenv
     try:
         from dotenv import load_dotenv
-
         load_dotenv()
         BOT_TOKEN = os.getenv("BOT_TOKEN")
     except ImportError:
