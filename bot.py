@@ -21,7 +21,9 @@ from aiogram.types import (
     Message,
 )
 
+import db
 from content import LETTERS, PRACTICES, QUESTIONS, TYPES, WELCOME
+from tasks import PROGRAM_FINAL, PROGRAM_NOT_READY, TASKS
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +44,7 @@ def main_menu_kb() -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")],
             [InlineKeyboardButton(text="📖 Четыре типа людей", callback_data="show_types")],
             [InlineKeyboardButton(text="🧘 Практики", callback_data="show_practices")],
+            [InlineKeyboardButton(text="📅 Задание дня", callback_data="daily_task")],
         ]
     )
 
@@ -90,6 +93,7 @@ def result_kb(type_num: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🧘 Моя практика", callback_data=f"practice:{type_num}")],
+            [InlineKeyboardButton(text="📅 Начать 30-дневную программу", callback_data="start_program")],
             [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
             [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
         ]
@@ -220,10 +224,106 @@ async def cb_answer(callback: CallbackQuery) -> None:
     else:
         type_num = calc_result(answers)
         sessions.pop(user_id, None)
+        db.set_user_type(user_id, type_num)
         await callback.message.answer(
             f"🎯 <b>Ваш результат: {type_num}-й тип</b>\n\n{TYPES[type_num]}",
             reply_markup=result_kb(type_num),
         )
+    await callback.answer()
+
+
+
+# ---------- 30-дневная программа ----------
+
+async def send_daily_task(message: Message, user_id: int) -> None:
+    type_num = db.get_user_type(user_id)
+    if type_num is None:
+        await message.answer(
+            "Сначала пройдите тест, чтобы я подобрал задания именно для вашего типа 🙂",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")]
+                ]
+            ),
+        )
+        return
+
+    tasks = TASKS.get(type_num)
+    if not tasks:
+        await message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb())
+        return
+
+    day = db.get_program_day(user_id)
+    if day is None:
+        await message.answer(
+            f"📅 <b>30-дневная программа для {type_num}-го типа</b>\n\n"
+            "Каждый день вы будете получать одно задание. "
+            "Новое задание открывается на следующий календарный день.\n\n"
+            "Начать сегодня?",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🚀 Начать программу", callback_data="start_program")],
+                    [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+                ]
+            ),
+        )
+        return
+
+    if day > len(tasks):
+        await message.answer(
+            PROGRAM_FINAL,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
+                    [InlineKeyboardButton(text="🔁 Начать программу заново", callback_data="restart_program")],
+                    [InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")],
+                ]
+            ),
+        )
+        return
+
+    await message.answer(
+        f"📅 День {day} из {len(tasks)}\n\n{tasks[day - 1]}",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")]]
+        ),
+    )
+
+
+@dp.message(Command("day"))
+async def cmd_day(message: Message) -> None:
+    await send_daily_task(message, message.from_user.id)
+
+
+@dp.callback_query(F.data == "daily_task")
+async def cb_daily_task(callback: CallbackQuery) -> None:
+    await send_daily_task(callback.message, callback.from_user.id)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "start_program")
+async def cb_start_program(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    type_num = db.get_user_type(user_id)
+    if type_num is None:
+        await callback.answer("Сначала пройдите тест 🙂", show_alert=True)
+        return
+    if not TASKS.get(type_num):
+        await callback.message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb())
+        await callback.answer()
+        return
+    if db.get_program_day(user_id) is None:
+        db.start_program(user_id)
+    await send_daily_task(callback.message, user_id)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "restart_program")
+async def cb_restart_program(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    db.reset_program(user_id)
+    db.start_program(user_id)
+    await send_daily_task(callback.message, user_id)
     await callback.answer()
 
 
@@ -233,6 +333,7 @@ async def fallback(message: Message) -> None:
         "Воспользуйтесь меню или командами:\n"
         "/start — главное меню\n"
         "/test — пройти тест\n"
+        "/day — задание дня\n"
         "/types — четыре типа людей\n"
         "/practices — практики",
         reply_markup=main_menu_kb(),
@@ -240,6 +341,7 @@ async def fallback(message: Message) -> None:
 
 
 async def main() -> None:
+    db.init_db()
     if not BOT_TOKEN:
         raise RuntimeError(
             "Не задан BOT_TOKEN. Укажите токен бота в переменной окружения "
