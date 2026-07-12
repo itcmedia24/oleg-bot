@@ -61,10 +61,20 @@ async def send_result_voice(message: Message, type_num: int) -> None:
 
 # ---------- Клавиатуры ----------
 
-def main_menu_kb() -> InlineKeyboardMarkup:
+def main_menu_kb(has_type: bool = False) -> InlineKeyboardMarkup:
+    """Главное меню.
+
+    До прохождения теста — только одна кнопка «Пройти тест».
+    После — открывается полный набор возможностей.
+    """
+    if not has_type:
+        return InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")],
+            ]
+        )
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="📝 Пройти тест",    callback_data="start_test")],
             [
                 InlineKeyboardButton(text="📅 Задание дня",  callback_data="daily_task"),
                 InlineKeyboardButton(text="🧘 Моя практика", callback_data="my_practice"),
@@ -73,7 +83,25 @@ def main_menu_kb() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(text="📖 4 типа людей", callback_data="show_types"),
                 InlineKeyboardButton(text="✨ Все практики",  callback_data="show_practices"),
             ],
+            [InlineKeyboardButton(text="🔄 Пройти тест заново", callback_data="start_test")],
         ]
+    )
+
+
+def menu_kb_for(user_id: int) -> InlineKeyboardMarkup:
+    """Меню с учётом того, прошёл ли пользователь тест."""
+    return main_menu_kb(db.get_user_type(user_id) is not None)
+
+
+def take_test_first(text: str) -> tuple[str, InlineKeyboardMarkup]:
+    """Сообщение-заглушка с единственной кнопкой «Пройти тест»."""
+    return (
+        text,
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="📝 Пройти тест", callback_data="start_test")]
+            ]
+        ),
     )
 
 
@@ -158,7 +186,7 @@ def calc_result(answers: list[int]) -> int:
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer(WELCOME, reply_markup=main_menu_kb())
+    await message.answer(WELCOME, reply_markup=menu_kb_for(message.from_user.id))
 
 
 @dp.message(Command("test"))
@@ -174,22 +202,34 @@ async def cmd_day(message: Message) -> None:
 
 @dp.message(Command("types"))
 async def cmd_types(message: Message) -> None:
+    if db.get_user_type(message.from_user.id) is None:
+        await message.answer(*take_test_first(
+            "Сначала пройди тест — после него откроются описания типов, "
+            "практики и задания 🙂"
+        ))
+        return
     await message.answer("Выберите тип, чтобы прочитать описание:", reply_markup=types_kb())
 
 
 @dp.message(Command("practices"))
 async def cmd_practices(message: Message) -> None:
+    if db.get_user_type(message.from_user.id) is None:
+        await message.answer(*take_test_first(
+            "Сначала пройди тест — после него откроются практики, "
+            "описания типов и задания 🙂"
+        ))
+        return
     await message.answer("Выберите практику для своего типа:", reply_markup=practices_kb())
 
 
 @dp.message(Command("menu"))
 async def cmd_menu(message: Message) -> None:
-    await message.answer(WELCOME, reply_markup=main_menu_kb())
+    await message.answer(WELCOME, reply_markup=menu_kb_for(message.from_user.id))
 
 
 @dp.callback_query(F.data == "menu")
 async def cb_menu(callback: CallbackQuery) -> None:
-    await callback.message.answer(WELCOME, reply_markup=main_menu_kb())
+    await callback.message.answer(WELCOME, reply_markup=menu_kb_for(callback.from_user.id))
     await callback.answer()
 
 
@@ -303,7 +343,7 @@ async def send_daily_task(message: Message, user_id: int) -> None:
 
     tasks = TASKS.get(type_num)
     if not tasks:
-        await message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb())
+        await message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb(True))
         return
 
     day = db.get_program_day(user_id)
@@ -357,7 +397,7 @@ async def cb_start_program(callback: CallbackQuery) -> None:
         await callback.answer("Сначала пройди тест 🙂", show_alert=True)
         return
     if not TASKS.get(type_num):
-        await callback.message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb())
+        await callback.message.answer(PROGRAM_NOT_READY, reply_markup=main_menu_kb(True))
         await callback.answer()
         return
     if db.get_program_day(user_id) is None:
@@ -377,7 +417,7 @@ async def cb_restart_program(callback: CallbackQuery) -> None:
 
 @dp.message()
 async def fallback(message: Message) -> None:
-    await message.answer(WELCOME, reply_markup=main_menu_kb())
+    await message.answer(WELCOME, reply_markup=menu_kb_for(message.from_user.id))
 
 
 # ---------- Запуск ----------
