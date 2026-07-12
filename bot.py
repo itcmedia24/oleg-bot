@@ -5,6 +5,7 @@ import asyncio
 import logging
 import os
 from collections import Counter
+from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
@@ -13,6 +14,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     BotCommand,
     CallbackQuery,
+    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -31,6 +33,27 @@ dp = Dispatcher()
 
 # user_id -> список ответов (индексы 0..3)
 sessions: dict[int, list[int]] = {}
+
+# Голосовое сообщение после теста — по типам (файлы в папке voices/)
+VOICES_DIR = Path(__file__).parent / "voices"
+RESULT_VOICES: dict[int, str] = {
+    1: "type1.ogg",
+}
+
+
+async def send_result_voice(message: Message, type_num: int) -> None:
+    """Отправляет голосовое сообщение для типа, если оно есть."""
+    filename = RESULT_VOICES.get(type_num)
+    if not filename:
+        return
+    path = VOICES_DIR / filename
+    if not path.exists():
+        logger.warning("Голосовое для типа %s не найдено: %s", type_num, path)
+        return
+    try:
+        await message.answer_voice(FSInputFile(path))
+    except Exception:
+        logger.exception("Не удалось отправить голосовое для типа %s", type_num)
 
 
 # ---------- Клавиатуры ----------
@@ -258,6 +281,7 @@ async def cb_answer(callback: CallbackQuery) -> None:
             f"🎯 <b>Твой результат: {type_num}-й тип</b>\n\n{TYPES[type_num]}",
             reply_markup=result_kb(type_num),
         )
+        await send_result_voice(callback.message, type_num)
     await callback.answer()
 
 
