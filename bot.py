@@ -38,6 +38,9 @@ sessions: dict[int, list[int]] = {}
 VOICES_DIR = Path(__file__).parent / "voices"
 RESULT_VOICES: dict[int, str] = {
     1: "type1.ogg",
+    2: "type2.ogg",
+    3: "type3.ogg",
+    4: "type4.ogg",
 }
 
 
