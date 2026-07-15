@@ -149,7 +149,7 @@ def result_kb(type_num: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="🧘 Моя практика",            callback_data=f"practice:{type_num}")],
-            [InlineKeyboardButton(text="📅 Начать 30-дневную программу", callback_data="start_program")],
+            [InlineKeyboardButton(text="📅 Начать программу заданий", callback_data="start_program")],
             [InlineKeyboardButton(text="🔄 Пройти тест заново",      callback_data="start_test")],
             [InlineKeyboardButton(text="⬅️ В меню",                  callback_data="menu")],
         ]
@@ -328,7 +328,7 @@ async def cb_answer(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
-# ---------- 30-дневная программа ----------
+# ---------- Программа заданий (в своём темпе) ----------
 
 async def send_daily_task(message: Message, user_id: int) -> None:
     type_num = db.get_user_type(user_id)
@@ -349,10 +349,10 @@ async def send_daily_task(message: Message, user_id: int) -> None:
     day = db.get_program_day(user_id)
     if day is None:
         await message.answer(
-            f"📅 <b>30-дневная программа — {type_num}-й тип</b>\n\n"
-            "Каждый день одно задание. "
-            "Новое открывается на следующий календарный день.\n\n"
-            "Начать сегодня?",
+            f"📅 <b>Программа заданий — {type_num}-й тип</b>\n\n"
+            f"Всего {len(tasks)} заданий. Двигайся в своём темпе: "
+            "открывай по одному и переходи к следующему, когда будешь готов.\n\n"
+            "Начать с первого задания?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="🚀 Начать программу", callback_data="start_program")],
@@ -362,9 +362,15 @@ async def send_daily_task(message: Message, user_id: int) -> None:
         )
         return
 
-    if day > len(tasks):
+    total = len(tasks)
+    day = max(1, min(day, total))
+
+    if day >= total:
+        # Последнее задание: программа пройдена, но никого не выкидываем —
+        # тест заново только по желанию.
         await message.answer(
-            get_final(type_num),
+            f"📅 <b>Задание {day} из {total}</b>\n\n{tasks[day - 1]}\n\n"
+            f"{get_final(type_num)}",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="🔄 Пройти тест заново",      callback_data="start_test")],
@@ -376,9 +382,12 @@ async def send_daily_task(message: Message, user_id: int) -> None:
         return
 
     await message.answer(
-        f"📅 <b>День {day} из {len(tasks)}</b>\n\n{tasks[day - 1]}",
+        f"📅 <b>Задание {day} из {total}</b>\n\n{tasks[day - 1]}",
         reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="⬅️ В меню", callback_data="menu")]]
+            inline_keyboard=[
+                [InlineKeyboardButton(text="➡️ Следующее задание", callback_data="next_task")],
+                [InlineKeyboardButton(text="⬅️ В меню",            callback_data="menu")],
+            ]
         ),
     )
 
@@ -386,6 +395,18 @@ async def send_daily_task(message: Message, user_id: int) -> None:
 @dp.callback_query(F.data == "daily_task")
 async def cb_daily_task(callback: CallbackQuery) -> None:
     await send_daily_task(callback.message, callback.from_user.id)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "next_task")
+async def cb_next_task(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
+    type_num = db.get_user_type(user_id)
+    tasks = TASKS.get(type_num) if type_num is not None else None
+    # Двигаемся ровно на одно задание вперёд, ничего не перескакивая.
+    if tasks and db.get_program_day(user_id) is not None:
+        db.advance_program(user_id, len(tasks))
+    await send_daily_task(callback.message, user_id)
     await callback.answer()
 
 
